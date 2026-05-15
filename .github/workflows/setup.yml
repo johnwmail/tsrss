@@ -17,14 +17,21 @@ jobs:
       - run: npm ci
 
       - name: Create D1 database
+        id: create-db
         run: |
-          npx wrangler d1 create tsrss-db || echo "D1 database already exists"
+          if npx wrangler d1 create tsrss-db 2>&1 | tee /tmp/d1-create.log; then
+            echo "created=true" >> $GITHUB_OUTPUT
+          else
+            echo "created=false" >> $GITHUB_OUTPUT
+            echo "D1 database already exists"
+          fi
 
       - name: Create KV namespace
         run: |
           npx wrangler kv:namespace create tsrss-sessions || echo "KV namespace already exists"
 
       - name: Apply database migrations
+        if: steps.create-db.outputs.created == 'true'
         run: |
           npx wrangler d1 migrations apply tsrss-db
 
