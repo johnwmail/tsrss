@@ -1,0 +1,37 @@
+name: Setup
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Create D1 database
+        run: |
+          npx wrangler d1 create tsrss-db || echo "D1 database already exists"
+
+      - name: Create KV namespace
+        run: |
+          npx wrangler kv:namespace create tsrss-sessions || echo "KV namespace already exists"
+
+      - name: Apply database migrations
+        run: |
+          npx wrangler d1 migrations apply tsrss-db
+
+      - name: Verify resources
+        run: |
+          echo "=== D1 Databases ==="
+          npx wrangler d1 list
+          echo ""
+          echo "=== KV Namespaces ==="
+          npx wrangler kv:namespace list
