@@ -25,11 +25,17 @@ jobs:
 
       - name: Set version for production (tag)
         if: github.ref_type == 'tag'
-        run: sed -i 's/^TSRSS_VERSION = .*/TSRSS_VERSION = "${{ github.ref_name }}"/' wrangler.toml
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          sed -i "s/vDev/${VERSION}/g" wrangler.toml
+          echo "Version: ${VERSION}"
 
       - name: Set version for preview (commit SHA)
         if: github.ref_type != 'tag'
-        run: sed -i 's/^TSRSS_VERSION = .*/TSRSS_VERSION = "${{ github.sha[0:7] }}"/' wrangler.toml
+        run: |
+          VERSION="${GITHUB_SHA::7}"
+          sed -i "s/vDev/${VERSION}/g" wrangler.toml
+          echo "Version: ${VERSION}"
 
       - name: Auto-detect resource IDs
         run: |
