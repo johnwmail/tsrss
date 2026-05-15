@@ -26,8 +26,8 @@ jobs:
 
       - name: Auto-detect resource IDs
         run: |
-          D1_ID=$(npx wrangler d1 list --json 2>/dev/null | jq -r '.[] | select(.name == "tsrss-db") | .uuid')
-          KV_ID=$(npx wrangler kv:namespace list --json 2>/dev/null | jq -r '.[] | select(.title == "tsrss-sessions") | .id')
+          D1_ID=$(npx --silent wrangler d1 list --json 2>/dev/null | jq -r '.[] | select(.name == "tsrss-db") | .uuid' 2>/dev/null)
+          KV_ID=$(npx --silent wrangler kv:namespace list --json 2>/dev/null | jq -r '.[] | select(.title == "tsrss-sessions") | .id' 2>/dev/null)
           if [ -n "$D1_ID" ] && [ "$D1_ID" != "null" ]; then
             sed -i "s/__D1_DATABASE_ID__/$D1_ID/" wrangler.toml
           fi
