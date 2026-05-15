@@ -1,0 +1,28 @@
+name = "tsrss"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Auto-serve static assets (JS, CSS, favicons, app.html)
+assets = { directory = "./src/public", binding = "ASSETS" }
+
+# D1 database
+[[d1_databases]]
+binding = "DB"
+database_name = "tsrss-db"
+database_id = "__D1_DATABASE_ID__"
+
+# KV namespace for password auth sessions
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "__KV_NAMESPACE_ID__"
+
+# Cron trigger: refresh all feeds every 30 minutes
+[triggers]
+crons = ["*/30 * * * *"]
+
+# Environment variables
+[vars]
+TSRSS_AUTH_MODE = "password"
+TSRSS_PURGE_DAYS = "30"
+TSRSS_VERSION = "vDev"

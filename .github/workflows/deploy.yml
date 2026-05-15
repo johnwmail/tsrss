@@ -1,0 +1,63 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+      - name: Set version for production (tag)
+        if: github.ref_type == 'tag'
+        run: sed -i 's/^TSRSS_VERSION = .*/TSRSS_VERSION = "${{ github.ref_name }}"/' wrangler.toml
+
+      - name: Set version for preview (commit SHA)
+        if: github.ref_type != 'tag'
+        run: sed -i 's/^TSRSS_VERSION = .*/TSRSS_VERSION = "${{ github.sha[0:7] }}"/' wrangler.toml
+
+      - name: Auto-detect resource IDs
+        run: |
+          D1_ID=$(npx wrangler d1 info tsrss-db --format json 2>/dev/null | jq -r '.[0].uuid')
+          KV_ID=$(npx wrangler kv:namespace list 2>/dev/null | jq -r '.[] | select(.title == "tsrss-sessions") | .id')
+          if [ -n "$D1_ID" ] && [ "$D1_ID" != "null" ]; then
+            sed -i "s/__D1_DATABASE_ID__/$D1_ID/" wrangler.toml
+          fi
+          if [ -n "$KV_ID" ] && [ "$KV_ID" != "null" ]; then
+            sed -i "s/__KV_NAMESPACE_ID__/$KV_ID/" wrangler.toml
+          fi
+
+      - name: Deploy to production
+        if: github.ref_type == 'tag'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+          secrets: |
+            TSRSS_PASSWORD
+
+      - name: Upload preview version
+        if: github.ref_type != 'tag'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: versions upload --preview-alias preview
+          secrets: |
+            TSRSS_PASSWORD

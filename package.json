@@ -1,0 +1,23 @@
+{
+  "name": "tsrss",
+  "version": "1.0.0",
+  "description": "TT-RSS Clone in TypeScript — Cloudflare Workers + D1",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit",
+    "migrate:local": "wrangler d1 migrations apply tsrss-db --local",
+    "migrate:prod": "wrangler d1 migrations apply tsrss-db"
+  },
+  "dependencies": {
+    "hono": "^4.7.0",
+    "rss-parser": "^3.13.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250501.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "wrangler": "^4.0.0"
+  }
+}
