@@ -22,7 +22,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set +e
-          RESULT=$(npx wrangler kv:namespace create tsrss-sessions 2>&1)
+          RESULT=$(npx wrangler kv namespace create tsrss-sessions 2>&1)
           echo "$RESULT"
           KV_ID=$(echo "$RESULT" | grep -oP '"id":\s*"\K[^"]+')
           echo ""
