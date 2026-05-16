@@ -94,5 +94,5 @@ jobs:
         run: |
           echo ""
           echo "========================================="
-          echo "Preview URL: https://preview-tsrss.${{ steps.subdomain.outputs.subdomain }}.workers.dev"
+          echo "Preview URL: https://tsrss-preview.${{ steps.subdomain.outputs.subdomain }}.workers.dev"
           echo "========================================="
