@@ -196,6 +196,28 @@ app.get('/__scheduled', async (c) => {
   return c.json({ status: 'ok' })
 })
 
+// ── Debug endpoint ──────────────────────────────────────────────────────────
+
+app.get('/api/debug', async (c) => {
+  const mode = c.env.TSRSS_AUTH_MODE === 'password' && !c.env.TSRSS_PASSWORD ? 'none' : c.env.TSRSS_AUTH_MODE || 'none'
+  const dbOk = await c.env.DB.prepare('SELECT 1 as ok').first<{ ok: number }>().then(() => true).catch(() => false)
+  const kvOk = await c.env.SESSIONS.get('test').then(() => true).catch(() => false)
+  return c.json({
+    authMode: mode,
+    hasPassword: !!c.env.TSRSS_PASSWORD,
+    dbOk,
+    kvOk,
+    version: c.env.TSRSS_VERSION,
+  })
+})
+
+// ── Global error handler ────────────────────────────────────────────────────
+
+app.onError((err, c) => {
+  console.error('Unhandled error:', err)
+  return c.json({ error: err.message || 'Internal Server Error', stack: err.stack }, 500)
+})
+
 export default app
 
 // ── Login page renderer ─────────────────────────────────────────────────────
