@@ -50,6 +50,38 @@ describe('OPML parser', () => {
 </opml>`
     expect(parseOPML(xml)).toEqual([])
   })
+
+  it('parses gorss-export format with empty text and self-closing tags', () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head><title>GoRSS Export</title></head>
+  <body>
+    <outline text="IoT" title="IoT">
+      <outline text="" type="rss" xmlUrl="http://www.steves-internet-guide.com/feed/" htmlUrl="http://www.steves-internet-guide.com"></outline>
+      <outline text="HiveMQ" title="HiveMQ" type="rss" xmlUrl="https://www.hivemq.com/feed.xml" htmlUrl="https://www.hivemq.com/"></outline>
+    </outline>
+    <outline text="Hacker News" type="rss" xmlUrl="https://news.ycombinator.com/rss" htmlUrl="https://news.ycombinator.com/"></outline>
+  </body>
+</opml>`
+
+    const feeds = parseOPML(xml)
+    expect(feeds).toHaveLength(3)
+    expect(feeds[0]).toEqual({
+      url: 'http://www.steves-internet-guide.com/feed/',
+      title: 'http://www.steves-internet-guide.com',
+      category: 'IoT',
+    })
+    expect(feeds[1]).toEqual({
+      url: 'https://www.hivemq.com/feed.xml',
+      title: 'HiveMQ',
+      category: 'IoT',
+    })
+    expect(feeds[2]).toEqual({
+      url: 'https://news.ycombinator.com/rss',
+      title: 'Hacker News',
+      category: '',
+    })
+  })
 })
 
 describe('OPML generator', () => {

@@ -22,7 +22,7 @@ export function parseOPML(xml: string): FeedImport[] {
     if (outlineMatch) {
       const text = outlineMatch[2]
       const xmlUrl = outlineMatch[3]
-      const title = extractAttr(trimmed, 'title') || text
+      const title = extractAttr(trimmed, 'title') || text || extractAttr(trimmed, 'htmlUrl') || xmlUrl
       feeds.push({
         url: xmlUrl,
         title: title,
@@ -30,11 +30,11 @@ export function parseOPML(xml: string): FeedImport[] {
       })
     } else if (catMatch) {
       const catName = extractAttr(trimmed, 'title') || catMatch[1]
-      categories.push(catName)
+      if (catName) categories.push(catName)
     }
 
-    // Closing outline tag = pop category
-    if (trimmed.includes('</outline>') && categories.length > 0) {
+    // Closing outline tag = pop category (but not on self-closing feed lines)
+    if (trimmed.includes('</outline>') && !trimmed.includes('xmlUrl=') && categories.length > 0) {
       categories.pop()
     }
   }

@@ -1278,10 +1278,19 @@
 
       const data = await res.json();
 
+      if (!res.ok) {
+        result.textContent = data.error || 'Import failed';
+        btn.disabled = false;
+        btn.textContent = 'Import';
+        return;
+      }
+
       // Close modal & clear form
       document.getElementById('modal-import').classList.remove('open');
       form.reset();
       result.textContent = '';
+
+      alert(`Imported ${data.imported} feeds (${data.skipped} skipped)`);
 
       await loadFeeds();
       await loadArticles();
