@@ -69,15 +69,14 @@ jobs:
 
       - name: Upload preview version
         if: github.ref_type != 'tag'
-        uses: cloudflare/wrangler-action@v3
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           TSRSS_PASSWORD: ${{ secrets.TSRSS_PASSWORD }}
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --name tsrss-preview
-          secrets: |
-            TSRSS_PASSWORD
+        run: |
+          sed -i 's/name = "tsrss"/name = "tsrss-preview"/' wrangler.toml
+          echo "$TSRSS_PASSWORD" | npx wrangler secret put TSRSS_PASSWORD --name tsrss-preview
+          npx wrangler deploy
 
       - name: Get workers.dev subdomain
         id: subdomain
