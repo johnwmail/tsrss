@@ -58,6 +58,8 @@ jobs:
       - name: Deploy to production
         if: github.ref_type == 'tag'
         uses: cloudflare/wrangler-action@v3
+        env:
+          TSRSS_PASSWORD: ${{ secrets.TSRSS_PASSWORD }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -68,6 +70,8 @@ jobs:
       - name: Upload preview version
         if: github.ref_type != 'tag'
         uses: cloudflare/wrangler-action@v3
+        env:
+          TSRSS_PASSWORD: ${{ secrets.TSRSS_PASSWORD }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
