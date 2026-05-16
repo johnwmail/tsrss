@@ -2,7 +2,7 @@ import Parser from 'rss-parser'
 
 const feedParser = new Parser({
   timeout: 30000,
-  headers: { 'User-Agent': 'GoRSS/1.0 (feed reader)' },
+  headers: { 'User-Agent': 'TSRSS/1.0 (feed reader)' },
   maxRedirects: 5,
 })
 
@@ -50,7 +50,7 @@ async function fetchWithCaching(
   lastModified: string,
 ): Promise<FeedFetchResult> {
   const headers: Record<string, string> = {
-    'User-Agent': 'GoRSS/1.0 (feed reader)',
+    'User-Agent': 'TSRSS/1.0 (feed reader)',
     'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
   }
   if (etag) headers['If-None-Match'] = etag

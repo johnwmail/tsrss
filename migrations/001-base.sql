@@ -1,4 +1,4 @@
--- Base schema for GoRSS
+-- Base schema for TSRSS
 --
 -- Migrations tracking table
 CREATE TABLE IF NOT EXISTS migrations (

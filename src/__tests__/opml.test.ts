@@ -60,9 +60,9 @@ describe('OPML generator', () => {
       { url: 'https://example.com/feed.xml', title: 'Uncategorized', siteURL: 'https://example.com', category: '' },
     ]
 
-    const opml = generateOPML('GoRSS Export', feeds)
-    expect(opml).toContain('<?xml version="1.0"')
-    expect(opml).toContain('<title>GoRSS Export</title>')
+    const opml = generateOPML('TSRSS Export', feeds)
+
+    expect(opml).toContain('<title>TSRSS Export</title>')
     expect(opml).toContain('xmlUrl="https://hnrss.org/frontpage"')
     expect(opml).toContain('xmlUrl="https://feeds.bbci.co.uk/news/rss.xml"')
     expect(opml).toContain('xmlUrl="https://example.com/feed.xml"')

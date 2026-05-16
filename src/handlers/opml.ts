@@ -22,7 +22,7 @@ export async function handleExportOPML(c: Context<{ Bindings: Env }>) {
     category: f.category_id ? catMap.get(f.category_id) || '' : '',
   }))
 
-  const opml = generateOPML('GoRSS Export', exports)
+  const opml = generateOPML('TSRSS Export', exports)
 
   c.header('Content-Type', 'application/xml')
   c.header('Content-Disposition', 'attachment; filename=tsrss-feeds.opml')

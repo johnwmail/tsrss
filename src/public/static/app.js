@@ -1,4 +1,4 @@
-// GoRSS - Unified Application
+// TSRSS - Unified Application
 (function() {
   'use strict';
 
@@ -146,7 +146,7 @@
   const feedsList = document.getElementById('feeds-list');
 
   // Initialize - handle both cases: DOM already loaded or still loading
-  console.log('GoRSS script loaded, readyState:', document.readyState);
+  console.log('TSRSS script loaded, readyState:', document.readyState);
   if (document.readyState === 'loading') {
     console.log('Adding DOMContentLoaded listener');
     document.addEventListener('DOMContentLoaded', init);
@@ -179,7 +179,7 @@
   });
 
   async function init() {
-    console.log('GoRSS init starting...');
+    console.log('TSRSS init starting...');
     try {
       setupEventListeners();
       console.log('Event listeners set up');
@@ -187,9 +187,9 @@
       console.log('Keyboard nav set up');
       setupTitleEdit();
       await reloadData();
-      console.log('GoRSS init complete');
+      console.log('TSRSS init complete');
     } catch (e) {
-      console.error('GoRSS init error:', e);
+      console.error('TSRSS init error:', e);
     }
   }
 
@@ -1186,7 +1186,7 @@
       }
 
       // Update browser tab title with unread count
-      document.title = newUnread > 0 ? `GoRSS (${newUnread})` : 'GoRSS';
+      document.title = newUnread > 0 ? `TSRSS (${newUnread})` : 'TSRSS';
     } catch (e) {
       console.error('Failed to update counts:', e);
     }
