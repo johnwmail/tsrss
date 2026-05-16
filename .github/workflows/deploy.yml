@@ -68,3 +68,12 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: versions upload --preview-alias preview
+
+      - name: Output preview URL
+        if: github.ref_type != 'tag'
+        run: |
+          echo ""
+          echo "========================================="
+          echo "Preview URL: https://preview-tsrss.<your-account>.workers.dev"
+          echo "Replace <your-account> with your Cloudflare workers.dev subdomain"
+          echo "========================================="
