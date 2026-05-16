@@ -46,6 +46,8 @@ jobs:
           D1_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r '.[] | select(.name == "tsrss-db") | .uuid' 2>/dev/null)
           KV_ID=$(curl -s "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces" \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | jq -r '.result[] | select(.title == "tsrss-sessions") | .id' 2>/dev/null)
+          echo "D1_ID: $D1_ID"
+          echo "KV_ID: $KV_ID"
           if [ -n "$D1_ID" ] && [ "$D1_ID" != "null" ]; then
             sed -i "s/__D1_DATABASE_ID__/$D1_ID/" wrangler.toml
           fi
@@ -69,11 +71,28 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: versions upload --preview-alias preview
 
+      - name: Get workers.dev subdomain
+        id: subdomain
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          SUBDOMAIN=$(curl -s "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | jq -r '.result.subdomain')
+          echo "subdomain=$SUBDOMAIN" >> $GITHUB_OUTPUT
+
+      - name: Output production URL
+        if: github.ref_type == 'tag'
+        run: |
+          echo ""
+          echo "========================================="
+          echo "Production URL: https://tsrss.${{ steps.subdomain.outputs.subdomain }}.workers.dev"
+          echo "========================================="
+
       - name: Output preview URL
         if: github.ref_type != 'tag'
         run: |
           echo ""
           echo "========================================="
-          echo "Preview URL: https://preview-tsrss.<your-account>.workers.dev"
-          echo "Replace <your-account> with your Cloudflare workers.dev subdomain"
+          echo "Preview URL: https://preview-tsrss.${{ steps.subdomain.outputs.subdomain }}.workers.dev"
           echo "========================================="
