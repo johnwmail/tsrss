@@ -1276,6 +1276,15 @@
         body: formData
       });
 
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const text = await res.text();
+        result.textContent = text || 'Import failed';
+        btn.disabled = false;
+        btn.textContent = 'Import';
+        return;
+      }
+
       const data = await res.json();
 
       if (!res.ok) {

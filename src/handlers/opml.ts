@@ -37,7 +37,14 @@ export async function handleImportOPML(c: Context<{ Bindings: Env }>) {
   if (!file) return c.json({ error: 'no file provided' }, 400)
 
   const xml = await file.text()
-  const feeds = parseOPML(xml)
+  let feeds
+  try {
+    feeds = parseOPML(xml)
+  } catch (err) {
+    return c.json({ error: 'failed to parse OPML: ' + String(err) }, 400)
+  }
+
+  if (feeds.length === 0) return c.json({ error: 'no feeds found in OPML' }, 400)
 
   // Resolve category mappings
   const existingCats = await getCategories(c.env.DB, userID)

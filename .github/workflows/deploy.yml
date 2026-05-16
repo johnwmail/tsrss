@@ -62,6 +62,8 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
+          secrets: |
+            TSRSS_PASSWORD
 
       - name: Upload preview version
         if: github.ref_type != 'tag'
@@ -70,6 +72,8 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --name tsrss-preview
+          secrets: |
+            TSRSS_PASSWORD
 
       - name: Get workers.dev subdomain
         id: subdomain
