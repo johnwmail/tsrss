@@ -2,6 +2,11 @@ name: Setup
 
 on:
   workflow_dispatch:
+    inputs:
+      db_name:
+        description: 'D1 database name to create (leave empty to create both)'
+        required: false
+        default: ''
 
 jobs:
   setup:
@@ -17,6 +22,7 @@ jobs:
       - run: npm ci
 
       - name: Create D1 database
+        if: github.event.inputs.db_name == '' || github.event.inputs.db_name == 'tsrss-db'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -25,6 +31,7 @@ jobs:
           command: d1 create tsrss-db
 
       - name: Create preview D1 database
+        if: github.event.inputs.db_name == '' || github.event.inputs.db_name == 'tsrss-preview-db'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -56,6 +63,7 @@ jobs:
           fi
 
       - name: Apply migrations to production
+        if: github.event.inputs.db_name == '' || github.event.inputs.db_name == 'tsrss-db'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -63,6 +71,7 @@ jobs:
           command: d1 migrations apply tsrss-db --remote
 
       - name: Apply migrations to preview
+        if: github.event.inputs.db_name == '' || github.event.inputs.db_name == 'tsrss-preview-db'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -70,6 +79,7 @@ jobs:
           command: d1 migrations apply tsrss-preview-db --remote --env preview
 
       - name: Create KV namespace
+        if: github.event.inputs.db_name == '' || github.event.inputs.db_name == 'tsrss-db'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
@@ -78,6 +88,7 @@ jobs:
           command: kv namespace create tsrss-sessions
 
       - name: Create preview KV namespace
+        if: github.event.inputs.db_name == '' || github.event.inputs.db_name == 'tsrss-preview-db'
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
