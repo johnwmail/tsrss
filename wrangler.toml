@@ -26,3 +26,26 @@ crons = ["*/30 * * * *"]
 TSRSS_AUTH_MODE = "password"
 TSRSS_PURGE_DAYS = "30"
 TSRSS_VERSION = "vDev"
+
+# ── Preview environment ──────────────────────────────────────────────────────
+
+[env.preview]
+name = "tsrss-preview"
+
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "tsrss-preview-db"
+database_id = "__PREVIEW_D1_DATABASE_ID__"
+
+[[env.preview.kv_namespaces]]
+binding = "SESSIONS"
+id = "__PREVIEW_KV_NAMESPACE_ID__"
+
+# Preview cron disabled to avoid duplicate work with prod
+[env.preview.triggers]
+crons = []
+
+[env.preview.vars]
+TSRSS_AUTH_MODE = "password"
+TSRSS_PURGE_DAYS = "30"
+TSRSS_VERSION = "vDev-preview"

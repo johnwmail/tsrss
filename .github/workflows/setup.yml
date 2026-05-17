@@ -24,6 +24,14 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: d1 create tsrss-db
 
+      - name: Create preview D1 database
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 create tsrss-preview-db
+
       - name: Auto-detect resource IDs
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -31,20 +39,35 @@ jobs:
         run: |
           set +e
           D1_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r '.[] | select(.name == "tsrss-db") | .uuid' 2>/dev/null)
+          PREVIEW_D1_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r '.[] | select(.name == "tsrss-preview-db") | .uuid' 2>/dev/null)
           KV_ID=$(npx --silent wrangler kv namespace list --json 2>&1 | jq -r '.[] | select(.title == "tsrss-sessions") | .id' 2>/dev/null)
+          PREVIEW_KV_ID=$(npx --silent wrangler kv namespace list --json 2>&1 | jq -r '.[] | select(.title == "tsrss-preview-sessions") | .id' 2>/dev/null)
           if [ -n "$D1_ID" ] && [ "$D1_ID" != "null" ]; then
             sed -i "s/__D1_DATABASE_ID__/$D1_ID/" wrangler.toml
+          fi
+          if [ -n "$PREVIEW_D1_ID" ] && [ "$PREVIEW_D1_ID" != "null" ]; then
+            sed -i "s/__PREVIEW_D1_DATABASE_ID__/$PREVIEW_D1_ID/" wrangler.toml
           fi
           if [ -n "$KV_ID" ] && [ "$KV_ID" != "null" ]; then
             sed -i "s/__KV_NAMESPACE_ID__/$KV_ID/" wrangler.toml
           fi
+          if [ -n "$PREVIEW_KV_ID" ] && [ "$PREVIEW_KV_ID" != "null" ]; then
+            sed -i "s/__PREVIEW_KV_NAMESPACE_ID__/$PREVIEW_KV_ID/" wrangler.toml
+          fi
 
-      - name: Apply migrations
+      - name: Apply migrations to production
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: d1 migrations apply tsrss-db --remote
+
+      - name: Apply migrations to preview
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 migrations apply tsrss-preview-db --remote
 
       - name: Create KV namespace
         uses: cloudflare/wrangler-action@v3
@@ -53,3 +76,11 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: kv namespace create tsrss-sessions
+
+      - name: Create preview KV namespace
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: kv namespace create tsrss-preview-sessions
