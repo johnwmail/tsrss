@@ -18,9 +18,7 @@ import { handleSearchArticles } from './handlers/search'
 import { handleRefresh } from './handlers/refresh'
 import { handleExportOPML, handleImportOPML } from './handlers/opml'
 import { handleReorderFeeds } from './handlers/feeds-reorder'
-
-// Re-export the scheduled handler for cron triggers
-export { scheduled } from './cron/refreshFeeds'
+import { refreshAllFeeds, purgeOldArticles } from './feed/refresh'
 
 export type Env = DBEnv & {
   SESSIONS: KVNamespace
@@ -32,6 +30,16 @@ export type Env = DBEnv & {
 }
 
 const app = new Hono<{ Bindings: Env }>()
+
+async function logCronRun(env: Env, source: string, feedsChecked: number, articlesFound: number) {
+  try {
+    await env.DB.prepare(
+      "INSERT INTO cron_runs (source, feeds_checked, articles_found) VALUES (?, ?, ?)"
+    ).bind(source, feedsChecked, articlesFound).run()
+  } catch (err) {
+    console.warn('log cron run failed:', err)
+  }
+}
 
 // ── CSP middleware ──────────────────────────────────────────────────────────
 
@@ -193,6 +201,7 @@ app.get('/__scheduled', async (c) => {
   const { refreshAllFeeds, purgeOldArticles } = await import('./feed/refresh')
   c.executionCtx.waitUntil(refreshAllFeeds(c.env, c.executionCtx))
   await purgeOldArticles(c.env)
+  await logCronRun(c.env, 'manual', 0, 0)
   return c.json({ status: 'ok' })
 })
 
@@ -202,11 +211,13 @@ app.get('/api/debug', async (c) => {
   const mode = c.env.TSRSS_AUTH_MODE === 'password' && !c.env.TSRSS_PASSWORD ? 'none' : c.env.TSRSS_AUTH_MODE || 'none'
   const dbOk = await c.env.DB.prepare('SELECT 1 as ok').first<{ ok: number }>().then(() => true).catch(() => false)
   const kvOk = await c.env.SESSIONS.get('test').then(() => true).catch(() => false)
+  const cronRuns = await c.env.DB.prepare("SELECT * FROM cron_runs ORDER BY run_at DESC LIMIT 10").all()
   return c.json({
     authMode: mode,
     hasPassword: !!c.env.TSRSS_PASSWORD,
     dbOk,
     kvOk,
+    cronRuns: cronRuns.results || [],
     version: c.env.TSRSS_VERSION,
   })
 })
@@ -218,7 +229,16 @@ app.onError((err, c) => {
   return c.json({ error: err.message || 'Internal Server Error', stack: err.stack }, 500)
 })
 
-export default app
+export default {
+  fetch: app.fetch,
+  scheduled: async (event: ScheduledEvent, env: Env, ctx: ExecutionContext) => {
+    console.log('cron: starting feed refresh', event.cron, event.scheduledTime)
+    await refreshAllFeeds(env, ctx)
+    await purgeOldArticles(env)
+    await logCronRun(env, 'cron', 0, 0)
+    console.log('cron: feed refresh complete')
+  }
+}
 
 // ── Login page renderer ─────────────────────────────────────────────────────
 
