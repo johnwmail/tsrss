@@ -83,9 +83,9 @@ jobs:
         continue-on-error: true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          TSRSS_PASSWORD: ${{ secrets.TSRSS_PASSWORD }}
+          TSRSS_PREVIEW_PASSWORD: ${{ secrets.TSRSS_PREVIEW_PASSWORD }}
         run: |
-          echo "$TSRSS_PASSWORD" | npx wrangler secret put TSRSS_PASSWORD --env preview
+          echo "$TSRSS_PREVIEW_PASSWORD" | npx wrangler secret put TSRSS_PASSWORD --env preview
 
       - name: Deploy preview
         if: github.ref_type != 'tag'
