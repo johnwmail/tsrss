@@ -59,7 +59,9 @@ app.use('*', async (c, next) => {
     path === '/login' ||
     path.startsWith('/static/') ||
     path === '/favicon.ico' ||
-    path.startsWith('/apple-touch-icon')
+    path.startsWith('/apple-touch-icon') ||
+    path === '/api/status' ||
+    path === '/api/debug'
   ) {
     return next()
   }
@@ -206,6 +208,24 @@ app.get('/__scheduled', async (c) => {
 })
 
 // ── Debug endpoint ──────────────────────────────────────────────────────────
+
+app.get('/api/status', async (c) => {
+  const totalFeeds = await c.env.DB.prepare("SELECT COUNT(*) as count FROM feeds").first<{ count: number }>()
+  const totalArticles = await c.env.DB.prepare("SELECT COUNT(*) as count FROM articles").first<{ count: number }>()
+  const totalUsers = await c.env.DB.prepare("SELECT COUNT(*) as count FROM users").first<{ count: number }>()
+  const lastCronRuns = await c.env.DB.prepare("SELECT * FROM cron_runs ORDER BY run_at DESC LIMIT 5").all()
+  const feedsByError = await c.env.DB.prepare("SELECT COUNT(*) as count FROM feeds WHERE last_error IS NOT NULL").first<{ count: number }>()
+
+  return c.json({
+    feeds: totalFeeds?.count || 0,
+    articles: totalArticles?.count || 0,
+    users: totalUsers?.count || 0,
+    feedsWithError: feedsByError?.count || 0,
+    lastCronRuns: lastCronRuns.results || [],
+    version: c.env.TSRSS_VERSION,
+    uptime: Date.now(),
+  })
+})
 
 app.get('/api/debug', async (c) => {
   const mode = c.env.TSRSS_AUTH_MODE === 'password' && !c.env.TSRSS_PASSWORD ? 'none' : c.env.TSRSS_AUTH_MODE || 'none'
