@@ -4,9 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       db_name:
-        description: 'D1 database name to create (leave empty to create both)'
+        description: 'D1 database name to create (tsrss-db or tsrss-preview-db, leave empty to list only)'
         required: false
         default: ''
+      recreate:
+        description: 'Delete existing DB before creating (true/false, yes/no)'
+        required: false
+        default: 'false'
 
 jobs:
   setup:
@@ -21,77 +25,126 @@ jobs:
 
       - run: npm ci
 
-      - name: Create D1 database
-        if: github.event.inputs.db_name == '' || github.event.inputs.db_name == 'tsrss-db'
-        uses: cloudflare/wrangler-action@v3
-        continue-on-error: true
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 create tsrss-db
+      - name: Determine env flag
+        id: envflag
+        run: |
+          DB_NAME="${{ github.event.inputs.db_name }}"
+          RECREATE="${{ github.event.inputs.recreate }}"
 
-      - name: Create preview D1 database
-        if: github.event.inputs.db_name == '' || github.event.inputs.db_name == 'tsrss-preview-db'
-        uses: cloudflare/wrangler-action@v3
-        continue-on-error: true
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 create tsrss-preview-db
+          echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
 
-      - name: Auto-detect resource IDs
+          if [ "$DB_NAME" = "tsrss-preview-db" ]; then
+            echo "env_flag=--env preview" >> $GITHUB_OUTPUT
+            echo "kv_name=tsrss-preview-sessions" >> $GITHUB_OUTPUT
+            echo "d1_placeholder=__PREVIEW_D1_DATABASE_ID__" >> $GITHUB_OUTPUT
+            echo "kv_placeholder=__PREVIEW_KV_NAMESPACE_ID__" >> $GITHUB_OUTPUT
+          else
+            echo "env_flag=" >> $GITHUB_OUTPUT
+            echo "kv_name=tsrss-sessions" >> $GITHUB_OUTPUT
+            echo "d1_placeholder=__D1_DATABASE_ID__" >> $GITHUB_OUTPUT
+            echo "kv_placeholder=__KV_NAMESPACE_ID__" >> $GITHUB_OUTPUT
+          fi
+
+          RECREATE_LOWER=$(echo "$RECREATE" | tr '[:upper:]' '[:lower:]')
+          if [ "$RECREATE_LOWER" = "true" ] || [ "$RECREATE_LOWER" = "yes" ]; then
+            echo "recreate=true" >> $GITHUB_OUTPUT
+          else
+            echo "recreate=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: List existing resources
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          set +e
-          D1_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r '.[] | select(.name == "tsrss-db") | .uuid' 2>/dev/null)
-          PREVIEW_D1_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r '.[] | select(.name == "tsrss-preview-db") | .uuid' 2>/dev/null)
-          KV_ID=$(npx --silent wrangler kv namespace list --json 2>&1 | jq -r '.[] | select(.title == "tsrss-sessions") | .id' 2>/dev/null)
-          PREVIEW_KV_ID=$(npx --silent wrangler kv namespace list --json 2>&1 | jq -r '.[] | select(.title == "tsrss-preview-sessions") | .id' 2>/dev/null)
-          if [ -n "$D1_ID" ] && [ "$D1_ID" != "null" ]; then
-            sed -i "s/__D1_DATABASE_ID__/$D1_ID/" wrangler.toml
+          echo "=== Existing D1 Databases ==="
+          npx wrangler d1 list
+          echo ""
+          echo "=== Existing KV Namespaces ==="
+          npx wrangler kv namespace list
+
+      - name: Delete existing D1 database
+        if: github.event.inputs.db_name != '' && steps.envflag.outputs.recreate == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DB_NAME: ${{ github.event.inputs.db_name }}
+        run: |
+          DB_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r ".[] | select(.name == \"$DB_NAME\") | .uuid" 2>/dev/null)
+          if [ -n "$DB_ID" ] && [ "$DB_ID" != "null" ]; then
+            echo "Deleting existing D1 database: $DB_NAME ($DB_ID)"
+            npx wrangler d1 delete "$DB_NAME" --remote
+          else
+            echo "D1 database $DB_NAME does not exist, skipping delete"
           fi
-          if [ -n "$PREVIEW_D1_ID" ] && [ "$PREVIEW_D1_ID" != "null" ]; then
-            sed -i "s/__PREVIEW_D1_DATABASE_ID__/$PREVIEW_D1_ID/" wrangler.toml
-          fi
+
+      - name: Delete existing KV namespace
+        if: github.event.inputs.db_name != '' && steps.envflag.outputs.recreate == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          KV_NAME: ${{ steps.envflag.outputs.kv_name }}
+        run: |
+          KV_ID=$(npx --silent wrangler kv namespace list --json 2>&1 | jq -r ".[] | select(.title == \"$KV_NAME\") | .id" 2>/dev/null)
           if [ -n "$KV_ID" ] && [ "$KV_ID" != "null" ]; then
-            sed -i "s/__KV_NAMESPACE_ID__/$KV_ID/" wrangler.toml
-          fi
-          if [ -n "$PREVIEW_KV_ID" ] && [ "$PREVIEW_KV_ID" != "null" ]; then
-            sed -i "s/__PREVIEW_KV_NAMESPACE_ID__/$PREVIEW_KV_ID/" wrangler.toml
+            echo "Deleting existing KV namespace: $KV_NAME ($KV_ID)"
+            npx wrangler kv namespace delete "$KV_ID"
+          else
+            echo "KV namespace $KV_NAME does not exist, skipping delete"
           fi
 
-      - name: Apply migrations to production
-        if: github.event.inputs.db_name == '' || github.event.inputs.db_name == 'tsrss-db'
+      - name: Create D1 database
+        if: github.event.inputs.db_name != ''
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 create ${{ github.event.inputs.db_name }}
+
+      - name: Auto-detect D1 ID
+        if: github.event.inputs.db_name != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DB_NAME: ${{ github.event.inputs.db_name }}
+          PLACEHOLDER: ${{ steps.envflag.outputs.d1_placeholder }}
+        run: |
+          set +e
+          D1_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r ".[] | select(.name == \"$DB_NAME\") | .uuid" 2>/dev/null)
+          echo "D1_ID: $D1_ID"
+          if [ -n "$D1_ID" ] && [ "$D1_ID" != "null" ]; then
+            sed -i "s/$PLACEHOLDER/$D1_ID/" wrangler.toml
+          fi
+
+      - name: Apply migrations
+        if: github.event.inputs.db_name != ''
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 migrations apply tsrss-db --remote
-
-      - name: Apply migrations to preview
-        if: github.event.inputs.db_name == '' || github.event.inputs.db_name == 'tsrss-preview-db'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 migrations apply tsrss-preview-db --remote --env preview
+          command: d1 migrations apply ${{ github.event.inputs.db_name }} --remote ${{ steps.envflag.outputs.env_flag }}
 
       - name: Create KV namespace
-        if: github.event.inputs.db_name == '' || github.event.inputs.db_name == 'tsrss-db'
+        if: github.event.inputs.db_name != ''
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: kv namespace create tsrss-sessions
+          command: kv namespace create ${{ steps.envflag.outputs.kv_name }}
 
-      - name: Create preview KV namespace
-        if: github.event.inputs.db_name == '' || github.event.inputs.db_name == 'tsrss-preview-db'
-        uses: cloudflare/wrangler-action@v3
-        continue-on-error: true
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: kv namespace create tsrss-preview-sessions
+      - name: Auto-detect KV ID
+        if: github.event.inputs.db_name != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          KV_NAME: ${{ steps.envflag.outputs.kv_name }}
+          KV_PLACEHOLDER: ${{ steps.envflag.outputs.kv_placeholder }}
+        run: |
+          set +e
+          KV_ID=$(npx --silent wrangler kv namespace list --json 2>&1 | jq -r ".[] | select(.title == \"$KV_NAME\") | .id" 2>/dev/null)
+          echo "KV_ID: $KV_ID"
+          if [ -n "$KV_ID" ] && [ "$KV_ID" != "null" ]; then
+            sed -i "s/$KV_PLACEHOLDER/$KV_ID/" wrangler.toml
+          fi
