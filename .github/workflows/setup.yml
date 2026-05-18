@@ -70,13 +70,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           preCommands: |
-            KV_ID=$(wrangler kv namespace list --json 2>/dev/null | jq -r ".[] | select(.title == \"${{ steps.names.outputs.kv_name }}\") | .id")
-            if [ -n "$KV_ID" ] && [ "$KV_ID" != "null" ]; then
-              echo "Deleting KV: $KV_ID"
-              wrangler kv namespace delete "$KV_ID" -y
-            else
-              echo "KV not found"
-            fi
+            KV_ID=$(wrangler kv namespace list --json 2>/dev/null | jq -r ".[] | select(.title == \"${{ steps.names.outputs.kv_name }}\") | .id"); if [ -n "$KV_ID" ] && [ "$KV_ID" != "null" ]; then echo "Deleting KV: $KV_ID"; wrangler kv namespace delete "$KV_ID" -y; else echo "KV not found"; fi
           command: echo "done"
 
       - name: Create D1
