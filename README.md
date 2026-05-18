@@ -10,52 +10,9 @@ npx wrangler d1 migrations apply tsrss-db --local
 npx wrangler dev
 ```
 
-## Deploy
+## Setup (One-Time)
 
-### Prerequisites
-
-Create the required Cloudflare resources (run locally once):
-
-```bash
-# 1. Create D1 database
-npx wrangler d1 create tsrss-db
-
-# 2. Create KV namespace for sessions
-npx wrangler kv:namespace create tsrss-sessions
-
-# 3. Apply database migrations
-npx wrangler d1 migrations apply tsrss-db
-```
-
-**No need to edit `wrangler.toml`** — resource IDs are auto-detected by name during CI deploy.
-
-### Manual Deploy
-
-```bash
-# (Optional) Set password for auth
-npx wrangler secret put TSRSS_PASSWORD
-
-# Set version (replace with your tag or commit SHA)
-sed -i 's/^TSRSS_VERSION = .*/TSRSS_VERSION = "v0.1.0"/' wrangler.toml
-
-# Deploy to production
-npx wrangler deploy
-
-# Deploy preview (creates a new version, production untouched)
-sed -i 's/^TSRSS_VERSION = .*/TSRSS_VERSION = "abc1234"/' wrangler.toml
-
-npx wrangler versions upload --preview-alias preview
-# → Preview URL: preview-tsrss.<subdomain>.workers.dev
-```
-
-### CI/CD Deploy (GitHub Actions)
-
-| Trigger | Target | Version | How |
-|---------|--------|---------|-----|
-| Push tag `v*` (e.g. `v0.1.0`) | Production | Tag name | `wrangler deploy` |
-| `workflow_dispatch` (manual) | Preview | Commit SHA (7 chars) | `wrangler versions upload --preview-alias preview` |
-
-**Setup GitHub Secrets:**
+### GitHub Secrets
 
 Go to **Settings → Secrets and variables → Actions** and add:
 
@@ -64,6 +21,52 @@ Go to **Settings → Secrets and variables → Actions** and add:
 | `CLOUDFLARE_API_TOKEN` | ✅ | [API Tokens](https://dash.cloudflare.com/profile/api-tokens) — use "Edit Cloudflare Workers" template |
 | `CLOUDFLARE_ACCOUNT_ID` | ✅ | Cloudflare dashboard → right sidebar → Account ID |
 | `TSRSS_PASSWORD` | Optional | Your choice. Without it, auth falls back to `none` |
+| `TSRSS_PREVIEW_PASSWORD` | Optional | Separate password for preview environment |
+
+### CI Workflows
+
+| Workflow | Description |
+|----------|-------------|
+| **Setup** | Create D1 database, KV namespace, apply migrations |
+| **Deploy** | Deploy to preview or production |
+| **Test** | Run typecheck and unit tests |
+
+### Setup Workflow
+
+Run the **Setup** workflow to create Cloudflare resources. It supports two inputs:
+
+| Input | Description |
+|-------|-------------|
+| `db_name` | `tsrss-db` (prod) or `tsrss-preview-db` (preview). Leave empty to list existing resources only |
+| `recreate` | `true`/`yes` to delete existing DB+KV before creating. Default: `false` |
+
+**Via GitHub UI:** Actions → Setup → Run workflow → fill inputs
+
+**Via CLI:**
+```bash
+# Create preview DB (default)
+gh workflow run Setup --field db_name=tsrss-preview-db
+
+# Create production DB
+gh workflow run Setup --field db_name=tsrss-db
+
+# Recreate (delete first)
+gh workflow run Setup --field db_name=tsrss-preview-db --field recreate=true
+
+# Just list existing resources
+gh workflow run Setup
+```
+
+Run Setup once for each environment before deploying.
+
+## Deploy
+
+### CI/CD Deploy (GitHub Actions)
+
+| Trigger | Target | Version | How |
+|---------|--------|---------|-----|
+| Push tag `v*` (e.g. `v0.1.0`) | Production | Tag name | `wrangler deploy` |
+| Push to `main` or `workflow_dispatch` | Preview | Commit SHA (7 chars) | `wrangler deploy --env preview` |
 
 **Trigger production deploy:**
 ```bash
@@ -71,17 +74,43 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-**Trigger preview deploy:** GitHub Actions UI → Deploy workflow → Run workflow.
+**Trigger preview deploy:**
+```bash
+gh workflow run Deploy
+```
 
-Preview URL: `preview-tsrss.<subdomain>.workers.dev`
+### Environment Separation
 
-### Cron (Feed Refresh)
+| | Production | Preview |
+|---|---|---|
+| Worker name | `tsrss` | `tsrss-preview` |
+| D1 database | `tsrss-db` | `tsrss-preview-db` |
+| KV namespace | `tsrss-sessions` | `tsrss-preview-sessions` |
+| Cron trigger | Every 30 min | Disabled |
+| Password secret | `TSRSS_PASSWORD` | `TSRSS_PREVIEW_PASSWORD` |
+
+### Manual Deploy
+
+```bash
+# Set password for auth
+npx wrangler secret put TSRSS_PASSWORD
+
+# Deploy to production
+npx wrangler deploy
+
+# Deploy preview
+npx wrangler deploy --env preview
+```
+
+## Cron (Feed Refresh)
 
 Feeds are automatically refreshed every 30 minutes via the cron trigger in `wrangler.toml`:
 ```toml
 [triggers]
 crons = ["*/30 * * * *"]
 ```
+
+Cron runs only on the **production** worker. Preview cron is disabled to avoid duplicate work on the shared database.
 
 To change the interval, update the cron expression and redeploy.
 
@@ -103,9 +132,10 @@ To change the interval, update the cron expression and redeploy.
 For production, set secrets via `wrangler secret`:
 ```bash
 npx wrangler secret put TSRSS_PASSWORD
+npx wrangler secret put TSRSS_PASSWORD --env preview
 ```
 
-Or via GitHub Actions by adding `TSRSS_PASSWORD` to repo secrets.
+Or via GitHub Actions by adding `TSRSS_PASSWORD` and `TSRSS_PREVIEW_PASSWORD` to repo secrets.
 
 ## API Endpoints
 
@@ -139,6 +169,8 @@ Or via GitHub Actions by adding `TSRSS_PASSWORD` to repo secrets.
 | POST | `/api/feeds/refresh` | Refresh all feeds (alias) |
 | GET | `/api/opml/export` | Export feeds as OPML |
 | POST | `/api/opml/import` | Import feeds from OPML file |
+| GET | `/api/status` | Server status + recent cron runs |
+| GET | `/api/debug` | Debug info (auth mode, DB/KV health, cron runs) |
 | GET | `/mobile`, `/mobile/*` | Redirect to `/` (legacy) |
 | GET | `/__scheduled` | Manual cron trigger (refresh + purge) |
 | GET | `/static/*` | Static assets (JS, CSS, favicons) |
