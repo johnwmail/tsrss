@@ -45,8 +45,8 @@ jobs:
           set +e
           D1_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r '.[] | select(.name == "tsrss-db") | .uuid' 2>/dev/null)
           PREVIEW_D1_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r '.[] | select(.name == "tsrss-preview-db") | .uuid' 2>/dev/null)
-          KV_ID=$(npx wrangler kv namespace list --json 2>/dev/null | jq -r '.[] | select(.title == "tsrss-sessions") | .id' 2>/dev/null)
-          PREVIEW_KV_ID=$(npx wrangler kv namespace list --json 2>/dev/null | jq -r '.[] | select(.title == "tsrss-preview-sessions") | .id' 2>/dev/null)
+          KV_ID=$(npx wrangler kv namespace list 2>/dev/null | jq -r '.[] | select(.title == "tsrss-sessions") | .id' 2>/dev/null)
+          PREVIEW_KV_ID=$(npx wrangler kv namespace list 2>/dev/null | jq -r '.[] | select(.title == "tsrss-preview-sessions") | .id' 2>/dev/null)
           echo "D1_ID: $D1_ID"
           echo "PREVIEW_D1_ID: $PREVIEW_D1_ID"
           echo "KV_ID: $KV_ID"
