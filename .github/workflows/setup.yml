@@ -71,10 +71,11 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           KV_NAME: ${{ steps.names.outputs.kv_name }}
         run: |
-          KV_ID=$(npx --silent wrangler kv namespace list --json 2>/dev/null | jq -r ".[] | select(.title == \"$KV_NAME\") | .id")
+          KV_LIST=$(npx wrangler kv namespace list --json 2>/dev/null || true)
+          KV_ID=$(echo "$KV_LIST" | jq -r ".result[]? | select(.title == \"$KV_NAME\") | .id" 2>/dev/null || true)
           if [ -n "$KV_ID" ] && [ "$KV_ID" != "null" ]; then
             echo "Deleting KV: $KV_ID"
-            npx wrangler kv namespace delete "$KV_ID" -y
+            npx wrangler kv namespace delete "$KV_ID" -y || true
           else
             echo "KV not found, skipping"
           fi
@@ -93,7 +94,8 @@ jobs:
           DB_NAME: ${{ steps.names.outputs.db_name }}
           PLACEHOLDER: ${{ steps.names.outputs.d1_placeholder }}
         run: |
-          D1_ID=$(npx --silent wrangler d1 list --json | jq -r ".[] | select(.name == \"$DB_NAME\") | .uuid")
+          D1_LIST=$(npx wrangler d1 list --json 2>/dev/null || true)
+          D1_ID=$(echo "$D1_LIST" | jq -r ".result[]? | select(.name == \"$DB_NAME\") | .uuid" 2>/dev/null || true)
           [ -z "$D1_ID" ] || [ "$D1_ID" = "null" ] && { echo "Failed to find D1"; exit 1; }
           echo "D1_ID=$D1_ID"
           sed -i "s/$PLACEHOLDER/$D1_ID/" wrangler.toml
@@ -120,7 +122,8 @@ jobs:
           KV_NAME: ${{ steps.names.outputs.kv_name }}
           KV_PLACEHOLDER: ${{ steps.names.outputs.kv_placeholder }}
         run: |
-          KV_ID=$(npx --silent wrangler kv namespace list --json | jq -r ".[] | select(.title == \"$KV_NAME\") | .id")
+          KV_LIST=$(npx wrangler kv namespace list --json 2>/dev/null || true)
+          KV_ID=$(echo "$KV_LIST" | jq -r ".result[]? | select(.title == \"$KV_NAME\") | .id" 2>/dev/null || true)
           [ -z "$KV_ID" ] || [ "$KV_ID" = "null" ] && { echo "Failed to find KV"; exit 1; }
           echo "KV_ID=$KV_ID"
           sed -i "s/$KV_PLACEHOLDER/$KV_ID/" wrangler.toml
