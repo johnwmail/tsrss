@@ -111,7 +111,7 @@ Feeds are automatically refreshed every 30 minutes via the cron trigger in `wran
 crons = ["*/30 * * * *"]
 ```
 
-Cron runs only on the **production** worker. Preview cron is disabled to avoid duplicate refreshes against the preview database.
+Cron runs only on the **production** worker. Preview cron is disabled — preview is for manual testing only.
 
 To change the interval, update the cron expression and redeploy.
 

@@ -41,7 +41,7 @@ database_id = "__PREVIEW_D1_DATABASE_ID__"
 binding = "SESSIONS"
 id = "__PREVIEW_KV_NAMESPACE_ID__"
 
-# Preview cron disabled to avoid duplicate work with prod
+# Preview cron disabled — preview is for manual testing only
 [env.preview.triggers]
 crons = []
 
