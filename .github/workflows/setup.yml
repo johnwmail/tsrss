@@ -25,27 +25,23 @@ jobs:
 
       - run: npm ci
 
-      - name: Determine env flag
-        id: envflag
+      - name: Set resource names
+        id: names
         run: |
           DB_NAME="${{ github.event.inputs.db_name }}"
-          RECREATE="${{ github.event.inputs.recreate }}"
-
           echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
-
           if [ "$DB_NAME" = "tsrss-preview-db" ]; then
-            echo "env_flag=--env preview" >> $GITHUB_OUTPUT
             echo "kv_name=tsrss-preview-sessions" >> $GITHUB_OUTPUT
             echo "d1_placeholder=__PREVIEW_D1_DATABASE_ID__" >> $GITHUB_OUTPUT
             echo "kv_placeholder=__PREVIEW_KV_NAMESPACE_ID__" >> $GITHUB_OUTPUT
+            echo "env_flag=-e preview" >> $GITHUB_OUTPUT
           else
-            echo "env_flag=" >> $GITHUB_OUTPUT
             echo "kv_name=tsrss-sessions" >> $GITHUB_OUTPUT
             echo "d1_placeholder=__D1_DATABASE_ID__" >> $GITHUB_OUTPUT
             echo "kv_placeholder=__KV_NAMESPACE_ID__" >> $GITHUB_OUTPUT
+            echo "env_flag=" >> $GITHUB_OUTPUT
           fi
-
-          RECREATE_LOWER=$(echo "$RECREATE" | tr '[:upper:]' '[:lower:]')
+          RECREATE_LOWER=$(echo "${{ github.event.inputs.recreate }}" | tr '[:upper:]' '[:lower:]')
           if [ "$RECREATE_LOWER" = "true" ] || [ "$RECREATE_LOWER" = "yes" ]; then
             echo "recreate=true" >> $GITHUB_OUTPUT
           else
@@ -53,99 +49,78 @@ jobs:
           fi
 
       - name: List existing resources
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          echo "=== Existing D1 Databases ==="
-          npx wrangler d1 list
-          echo ""
-          echo "=== Existing KV Namespaces ==="
-          npx wrangler kv namespace list
-
-      - name: Delete existing D1 database
-        if: github.event.inputs.db_name != '' && steps.envflag.outputs.recreate == 'true'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DB_NAME: ${{ github.event.inputs.db_name }}
-          ENV_FLAG: ${{ steps.envflag.outputs.env_flag }}
-        run: |
-          DB_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r ".[] | select(.name == \"$DB_NAME\") | .uuid" 2>/dev/null)
-          if [ -n "$DB_ID" ] && [ "$DB_ID" != "null" ]; then
-            echo "Deleting existing D1 database: $DB_NAME ($DB_ID)"
-            npx wrangler d1 delete "$DB_NAME" -y
-          else
-            echo "D1 database $DB_NAME does not exist, skipping delete"
-          fi
-
-      - name: Delete existing KV namespace
-        if: github.event.inputs.db_name != '' && steps.envflag.outputs.recreate == 'true'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          KV_NAME: ${{ steps.envflag.outputs.kv_name }}
-        run: |
-          KV_ID=$(npx --silent wrangler kv namespace list --json 2>&1 | jq -r ".[] | select(.title == \"$KV_NAME\") | .id" 2>/dev/null)
-          if [ -n "$KV_ID" ] && [ "$KV_ID" != "null" ]; then
-            echo "Deleting existing KV namespace: $KV_NAME ($KV_ID)"
-            npx wrangler kv namespace delete "$KV_ID" -y
-          else
-            echo "KV namespace $KV_NAME does not exist, skipping delete"
-          fi
-
-      - name: Create D1 database
-        if: github.event.inputs.db_name != ''
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 create ${{ github.event.inputs.db_name }} ${{ steps.envflag.outputs.env_flag }}
+          command: d1 list
 
-      - name: Auto-detect D1 ID
-        if: github.event.inputs.db_name != ''
+      - name: Delete D1
+        if: steps.names.outputs.db_name != '' && steps.names.outputs.recreate == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 delete ${{ steps.names.outputs.db_name }} -y
+
+      - name: Delete KV
+        if: steps.names.outputs.db_name != '' && steps.names.outputs.recreate == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          preCommands: |
+            KV_ID=$(wrangler kv namespace list --json 2>/dev/null | jq -r ".[] | select(.title == \"${{ steps.names.outputs.kv_name }}\") | .id")
+            if [ -n "$KV_ID" ] && [ "$KV_ID" != "null" ]; then
+              echo "Deleting KV: $KV_ID"
+              wrangler kv namespace delete "$KV_ID" -y
+            else
+              echo "KV not found"
+            fi
+          command: echo "done"
+
+      - name: Create D1
+        if: steps.names.outputs.db_name != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 create ${{ steps.names.outputs.db_name }}
+
+      - name: Get D1 ID & update wrangler.toml
+        if: steps.names.outputs.db_name != ''
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DB_NAME: ${{ github.event.inputs.db_name }}
-          PLACEHOLDER: ${{ steps.envflag.outputs.d1_placeholder }}
+          DB_NAME: ${{ steps.names.outputs.db_name }}
+          PLACEHOLDER: ${{ steps.names.outputs.d1_placeholder }}
         run: |
-          D1_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r ".[] | select(.name == \"$DB_NAME\") | .uuid")
-          if [ -z "$D1_ID" ] || [ "$D1_ID" = "null" ]; then
-            echo "Failed to find D1 database: $DB_NAME"
-            exit 1
-          fi
-          echo "D1_ID: $D1_ID"
+          D1_ID=$(npx --silent wrangler d1 list --json | jq -r ".[] | select(.name == \"$DB_NAME\") | .uuid")
+          [ -z "$D1_ID" ] || [ "$D1_ID" = "null" ] && { echo "Failed to find D1"; exit 1; }
+          echo "D1_ID=$D1_ID"
           sed -i "s/$PLACEHOLDER/$D1_ID/" wrangler.toml
 
       - name: Apply migrations
-        if: github.event.inputs.db_name != ''
+        if: steps.names.outputs.db_name != ''
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 migrations apply ${{ github.event.inputs.db_name }} --remote ${{ steps.envflag.outputs.env_flag }}
+          command: d1 migrations apply ${{ steps.names.outputs.db_name }} --remote ${{ steps.names.outputs.env_flag }}
 
-      - name: Create KV namespace
-        if: github.event.inputs.db_name != ''
+      - name: Create KV
+        if: steps.names.outputs.db_name != ''
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: kv namespace create ${{ steps.envflag.outputs.kv_name }}
+          command: kv namespace create ${{ steps.names.outputs.kv_name }}
 
-      - name: Auto-detect KV ID
-        if: github.event.inputs.db_name != ''
+      - name: Get KV ID & update wrangler.toml
+        if: steps.names.outputs.db_name != ''
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          KV_NAME: ${{ steps.envflag.outputs.kv_name }}
-          KV_PLACEHOLDER: ${{ steps.envflag.outputs.kv_placeholder }}
+          KV_NAME: ${{ steps.names.outputs.kv_name }}
+          KV_PLACEHOLDER: ${{ steps.names.outputs.kv_placeholder }}
         run: |
-          KV_ID=$(npx --silent wrangler kv namespace list --json 2>&1 | jq -r ".[] | select(.title == \"$KV_NAME\") | .id")
-          if [ -z "$KV_ID" ] || [ "$KV_ID" = "null" ]; then
-            echo "Failed to find KV namespace: $KV_NAME"
-            exit 1
-          fi
-          echo "KV_ID: $KV_ID"
+          KV_ID=$(npx --silent wrangler kv namespace list --json | jq -r ".[] | select(.title == \"$KV_NAME\") | .id")
+          [ -z "$KV_ID" ] || [ "$KV_ID" = "null" ] && { echo "Failed to find KV"; exit 1; }
+          echo "KV_ID=$KV_ID"
           sed -i "s/$KV_PLACEHOLDER/$KV_ID/" wrangler.toml
