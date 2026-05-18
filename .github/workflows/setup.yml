@@ -73,7 +73,7 @@ jobs:
         run: |
           LIST_OUT=$(npx wrangler kv namespace list 2>&1 || true)
           echo "$LIST_OUT"
-          KV_ID=$(echo "$LIST_OUT" | grep "\"$KV_NAME\"" | grep -oP '[0-9a-f]{32}' || true)
+          KV_ID=$(echo "$LIST_OUT" | jq -r ".[] | select(.title == \"$KV_NAME\") | .id" 2>/dev/null || true)
           if [ -n "$KV_ID" ]; then
             echo "Deleting KV: $KV_NAME ($KV_ID)"
             npx wrangler kv namespace delete --namespace-id "$KV_ID" -y || true
@@ -125,7 +125,7 @@ jobs:
             echo "KV may already exist, fetching existing ID..."
             LIST_OUT=$(npx wrangler kv namespace list 2>&1 || true)
             echo "$LIST_OUT"
-            KV_ID=$(echo "$LIST_OUT" | grep "\"$KV_NAME\"" | grep -oP '[0-9a-f]{32}' || true)
+            KV_ID=$(echo "$LIST_OUT" | jq -r ".[] | select(.title == \"$KV_NAME\") | .id" 2>/dev/null || true)
           fi
           [ -z "$KV_ID" ] || [ "$KV_ID" = "null" ] && { echo "Failed to find KV ID"; exit 1; }
           echo "KV_ID=$KV_ID"
