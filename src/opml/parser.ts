@@ -21,15 +21,15 @@ export function parseOPML(xml: string): FeedImport[] {
 
     if (outlineMatch) {
       const text = outlineMatch[2]
-      const xmlUrl = outlineMatch[3]
-      const title = extractAttr(trimmed, 'title') || text || extractAttr(trimmed, 'htmlUrl') || xmlUrl
+      const xmlUrl = unescapeXML(outlineMatch[3])
+      const title = unescapeXML(extractAttr(trimmed, 'title') || text || extractAttr(trimmed, 'htmlUrl') || xmlUrl)
       feeds.push({
         url: xmlUrl,
-        title: title,
+        title,
         category: categories.length > 0 ? categories[categories.length - 1] : '',
       })
     } else if (catMatch) {
-      const catName = extractAttr(trimmed, 'title') || catMatch[1]
+      const catName = unescapeXML(extractAttr(trimmed, 'title') || catMatch[1])
       if (catName) categories.push(catName)
     }
 
@@ -87,4 +87,16 @@ ${body}  </body>
 
 export function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+export function unescapeXML(s: string): string {
+  return s
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x2019;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
 }

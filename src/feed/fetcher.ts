@@ -56,7 +56,14 @@ async function fetchWithCaching(
   if (etag) headers['If-None-Match'] = etag
   if (lastModified) headers['If-Modified-Since'] = lastModified
 
-  const resp = await fetch(urlStr, { headers })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 15000)
+  let resp
+  try {
+    resp = await fetch(urlStr, { headers, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
 
   if (resp.status === 304) {
     throw new FeedNotModified()
