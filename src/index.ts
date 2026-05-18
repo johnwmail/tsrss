@@ -335,7 +335,7 @@ export function renderLoginPage(errorMsg: string, version: string): string {
       <input type="password" name="password" placeholder="Password" autofocus required>
       <button type="submit">Login</button>
     </form>
-    <a href="https://github.com/johnwmail/tsrss" class="version-link">${version}</a>
+    <span class="version-link">${version}</span>
   </div>
   <script>
     (function() {

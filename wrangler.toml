@@ -48,4 +48,4 @@ crons = []
 [env.preview.vars]
 TSRSS_AUTH_MODE = "password"
 TSRSS_PURGE_DAYS = "30"
-TSRSS_VERSION = "vDev-preview"
+TSRSS_VERSION = "vDev"
