@@ -62,7 +62,15 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DB_NAME: ${{ steps.names.outputs.db_name }}
         run: |
-          npx wrangler d1 delete "$DB_NAME" -y || echo "D1 not found or already deleted"
+          LIST_OUT=$(npx wrangler d1 list 2>&1 || true)
+          echo "$LIST_OUT"
+          DB_ID=$(echo "$LIST_OUT" | grep -B1 "\"$DB_NAME\"" | grep -oP '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' || true)
+          if [ -n "$DB_ID" ]; then
+            echo "Deleting D1: $DB_NAME ($DB_ID)"
+            npx wrangler d1 delete --remote "$DB_ID" -y || true
+          else
+            echo "D1 not found, skipping"
+          fi
 
       - name: Delete KV
         if: steps.names.outputs.db_name != '' && steps.names.outputs.recreate == 'true'
@@ -93,7 +101,10 @@ jobs:
           echo "$OUTPUT"
           D1_ID=$(echo "$OUTPUT" | grep -oP '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' || true)
           if [ -z "$D1_ID" ]; then
-            D1_ID=$(npx wrangler d1 list --json 2>/dev/null | grep -oP "\"uuid\":\s*\"([0-9a-f-]+)\"" | head -1 | grep -oP '[0-9a-f-]{36}' || true)
+            echo "DB may already exist, fetching existing ID..."
+            LIST_OUT=$(npx wrangler d1 list 2>&1 || true)
+            echo "$LIST_OUT"
+            D1_ID=$(echo "$LIST_OUT" | grep -B1 "\"$DB_NAME\"" | grep -oP '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' || true)
           fi
           [ -z "$D1_ID" ] || [ "$D1_ID" = "null" ] && { echo "Failed to find D1 ID"; exit 1; }
           echo "D1_ID=$D1_ID"
