@@ -65,23 +65,22 @@ jobs:
 
       - name: Delete existing D1 database
         if: github.event.inputs.db_name != '' && steps.envflag.outputs.recreate == 'true'
-        continue-on-error: true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DB_NAME: ${{ github.event.inputs.db_name }}
+          ENV_FLAG: ${{ steps.envflag.outputs.env_flag }}
         run: |
           DB_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r ".[] | select(.name == \"$DB_NAME\") | .uuid" 2>/dev/null)
           if [ -n "$DB_ID" ] && [ "$DB_ID" != "null" ]; then
             echo "Deleting existing D1 database: $DB_NAME ($DB_ID)"
-            npx wrangler d1 delete "$DB_NAME" -y
+            npx wrangler d1 delete "$DB_NAME" -y $ENV_FLAG
           else
             echo "D1 database $DB_NAME does not exist, skipping delete"
           fi
 
       - name: Delete existing KV namespace
         if: github.event.inputs.db_name != '' && steps.envflag.outputs.recreate == 'true'
-        continue-on-error: true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -98,11 +97,10 @@ jobs:
       - name: Create D1 database
         if: github.event.inputs.db_name != ''
         uses: cloudflare/wrangler-action@v3
-        continue-on-error: true
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 create ${{ github.event.inputs.db_name }}
+          command: d1 create ${{ github.event.inputs.db_name }} ${{ steps.envflag.outputs.env_flag }}
 
       - name: Auto-detect D1 ID
         if: github.event.inputs.db_name != ''
@@ -112,12 +110,13 @@ jobs:
           DB_NAME: ${{ github.event.inputs.db_name }}
           PLACEHOLDER: ${{ steps.envflag.outputs.d1_placeholder }}
         run: |
-          set +e
-          D1_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r ".[] | select(.name == \"$DB_NAME\") | .uuid" 2>/dev/null)
-          echo "D1_ID: $D1_ID"
-          if [ -n "$D1_ID" ] && [ "$D1_ID" != "null" ]; then
-            sed -i "s/$PLACEHOLDER/$D1_ID/" wrangler.toml
+          D1_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r ".[] | select(.name == \"$DB_NAME\") | .uuid")
+          if [ -z "$D1_ID" ] || [ "$D1_ID" = "null" ]; then
+            echo "Failed to find D1 database: $DB_NAME"
+            exit 1
           fi
+          echo "D1_ID: $D1_ID"
+          sed -i "s/$PLACEHOLDER/$D1_ID/" wrangler.toml
 
       - name: Apply migrations
         if: github.event.inputs.db_name != ''
@@ -125,12 +124,11 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 migrations apply ${{ github.event.inputs.db_name }} --remote${{ steps.envflag.outputs.env_flag != '' && format(' {0}', steps.envflag.outputs.env_flag) || '' }}
+          command: d1 migrations apply ${{ github.event.inputs.db_name }} --remote ${{ steps.envflag.outputs.env_flag }}
 
       - name: Create KV namespace
         if: github.event.inputs.db_name != ''
         uses: cloudflare/wrangler-action@v3
-        continue-on-error: true
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -144,9 +142,10 @@ jobs:
           KV_NAME: ${{ steps.envflag.outputs.kv_name }}
           KV_PLACEHOLDER: ${{ steps.envflag.outputs.kv_placeholder }}
         run: |
-          set +e
-          KV_ID=$(npx --silent wrangler kv namespace list --json 2>&1 | jq -r ".[] | select(.title == \"$KV_NAME\") | .id" 2>/dev/null)
-          echo "KV_ID: $KV_ID"
-          if [ -n "$KV_ID" ] && [ "$KV_ID" != "null" ]; then
-            sed -i "s/$KV_PLACEHOLDER/$KV_ID/" wrangler.toml
+          KV_ID=$(npx --silent wrangler kv namespace list --json 2>&1 | jq -r ".[] | select(.title == \"$KV_NAME\") | .id")
+          if [ -z "$KV_ID" ] || [ "$KV_ID" = "null" ]; then
+            echo "Failed to find KV namespace: $KV_NAME"
+            exit 1
           fi
+          echo "KV_ID: $KV_ID"
+          sed -i "s/$KV_PLACEHOLDER/$KV_ID/" wrangler.toml
