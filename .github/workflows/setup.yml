@@ -130,3 +130,15 @@ jobs:
           [ -z "$KV_ID" ] || [ "$KV_ID" = "null" ] && { echo "Failed to find KV ID"; exit 1; }
           echo "KV_ID=$KV_ID"
           sed -i "s/$KV_PLACEHOLDER/$KV_ID/" wrangler.toml
+
+      - name: Verify no placeholder tokens remain
+        if: steps.names.outputs.db_name != ''
+        env:
+          D1_PLACEHOLDER: ${{ steps.names.outputs.d1_placeholder }}
+          KV_PLACEHOLDER: ${{ steps.names.outputs.kv_placeholder }}
+        run: |
+          if grep -qE "$D1_PLACEHOLDER|$KV_PLACEHOLDER" wrangler.toml; then
+            echo "ERROR: resource ID not resolved: $D1_PLACEHOLDER or $KV_PLACEHOLDER"
+            exit 1
+          fi
+          echo "All resource IDs resolved"
