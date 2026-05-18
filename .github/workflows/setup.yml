@@ -58,16 +58,16 @@ jobs:
       - name: Delete D1
         if: steps.names.outputs.db_name != '' && steps.names.outputs.recreate == 'true'
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DB_NAME: ${{ steps.names.outputs.db_name }}
         run: |
-          LIST_OUT=$(npx wrangler d1 list 2>&1 || true)
-          echo "$LIST_OUT"
-          DB_ID=$(echo "$LIST_OUT" | grep "$DB_NAME" | grep -oP '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' || true)
-          if [ -n "$DB_ID" ]; then
+          DB_ID=$(curl -s "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/d1/database" \
+            -H "Authorization: Bearer $CF_API_TOKEN" | jq -r ".result[] | select(.name == \"$DB_NAME\") | .uuid")
+          if [ -n "$DB_ID" ] && [ "$DB_ID" != "null" ]; then
             echo "Deleting D1: $DB_NAME ($DB_ID)"
-            npx wrangler d1 delete --remote "$DB_ID" -y || true
+            curl -s -X DELETE "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/d1/database/$DB_ID" \
+              -H "Authorization: Bearer $CF_API_TOKEN" | jq .
           else
             echo "D1 not found, skipping"
           fi
