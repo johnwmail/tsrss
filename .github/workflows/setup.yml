@@ -74,7 +74,7 @@ jobs:
           DB_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r ".[] | select(.name == \"$DB_NAME\") | .uuid" 2>/dev/null)
           if [ -n "$DB_ID" ] && [ "$DB_ID" != "null" ]; then
             echo "Deleting existing D1 database: $DB_NAME ($DB_ID)"
-            npx wrangler d1 delete "$DB_NAME" --yes
+            npx wrangler d1 delete "$DB_NAME" -y
           else
             echo "D1 database $DB_NAME does not exist, skipping delete"
           fi
@@ -90,7 +90,7 @@ jobs:
           KV_ID=$(npx --silent wrangler kv namespace list --json 2>&1 | jq -r ".[] | select(.title == \"$KV_NAME\") | .id" 2>/dev/null)
           if [ -n "$KV_ID" ] && [ "$KV_ID" != "null" ]; then
             echo "Deleting existing KV namespace: $KV_NAME ($KV_ID)"
-            npx wrangler kv namespace delete "$KV_ID" --yes
+            npx wrangler kv namespace delete "$KV_ID" -y
           else
             echo "KV namespace $KV_NAME does not exist, skipping delete"
           fi
