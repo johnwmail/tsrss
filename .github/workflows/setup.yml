@@ -76,7 +76,7 @@ jobs:
           KV_ID=$(echo "$LIST_OUT" | grep -B1 "\"$KV_NAME\"" | grep -oP '[0-9a-f]{32}' || true)
           if [ -n "$KV_ID" ]; then
             echo "Deleting KV: $KV_NAME ($KV_ID)"
-            npx wrangler kv namespace delete "$KV_ID" -y || true
+            npx wrangler kv namespace delete --namespace-id "$KV_ID" -y || true
           else
             echo "KV not found, skipping"
           fi
