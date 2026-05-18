@@ -64,7 +64,7 @@ jobs:
         run: |
           LIST_OUT=$(npx wrangler d1 list 2>&1 || true)
           echo "$LIST_OUT"
-          DB_ID=$(echo "$LIST_OUT" | grep -B1 "\"$DB_NAME\"" | grep -oP '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' || true)
+          DB_ID=$(echo "$LIST_OUT" | grep "$DB_NAME" | grep -oP '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' || true)
           if [ -n "$DB_ID" ]; then
             echo "Deleting D1: $DB_NAME ($DB_ID)"
             npx wrangler d1 delete --remote "$DB_ID" -y || true
@@ -81,7 +81,7 @@ jobs:
         run: |
           LIST_OUT=$(npx wrangler kv namespace list 2>&1 || true)
           echo "$LIST_OUT"
-          KV_ID=$(echo "$LIST_OUT" | grep -B1 "\"$KV_NAME\"" | grep -oP '[0-9a-f]{32}' || true)
+          KV_ID=$(echo "$LIST_OUT" | grep "$KV_NAME" | grep -oP '[0-9a-f]{32}' || true)
           if [ -n "$KV_ID" ]; then
             echo "Deleting KV: $KV_NAME ($KV_ID)"
             npx wrangler kv namespace delete --namespace-id "$KV_ID" -y || true
@@ -104,7 +104,7 @@ jobs:
             echo "DB may already exist, fetching existing ID..."
             LIST_OUT=$(npx wrangler d1 list 2>&1 || true)
             echo "$LIST_OUT"
-            D1_ID=$(echo "$LIST_OUT" | grep -B1 "\"$DB_NAME\"" | grep -oP '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' || true)
+            D1_ID=$(echo "$LIST_OUT" | grep "$DB_NAME" | grep -oP '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' || true)
           fi
           [ -z "$D1_ID" ] || [ "$D1_ID" = "null" ] && { echo "Failed to find D1 ID"; exit 1; }
           echo "D1_ID=$D1_ID"
@@ -133,7 +133,7 @@ jobs:
             echo "KV may already exist, fetching existing ID..."
             LIST_OUT=$(npx wrangler kv namespace list 2>&1 || true)
             echo "$LIST_OUT"
-            KV_ID=$(echo "$LIST_OUT" | grep -B1 "\"$KV_NAME\"" | grep -oP '[0-9a-f]{32}' || true)
+            KV_ID=$(echo "$LIST_OUT" | grep "$KV_NAME" | grep -oP '[0-9a-f]{32}' || true)
           fi
           [ -z "$KV_ID" ] || [ "$KV_ID" = "null" ] && { echo "Failed to find KV ID"; exit 1; }
           echo "KV_ID=$KV_ID"
