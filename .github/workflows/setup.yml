@@ -125,7 +125,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 migrations apply ${{ github.event.inputs.db_name }} --remote ${{ steps.envflag.outputs.env_flag }}
+          command: d1 migrations apply ${{ github.event.inputs.db_name }} --remote${{ steps.envflag.outputs.env_flag != '' && format(' {0}', steps.envflag.outputs.env_flag) || '' }}
 
       - name: Create KV namespace
         if: github.event.inputs.db_name != ''

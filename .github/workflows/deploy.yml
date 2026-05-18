@@ -27,14 +27,14 @@ jobs:
         if: github.ref_type == 'tag'
         run: |
           VERSION="${GITHUB_REF_NAME}"
-          sed -i "s/vDev/${VERSION}/g" wrangler.toml
+          sed -i "0,/TSRSS_VERSION = \"vDev\"/s/TSRSS_VERSION = \"vDev\"/TSRSS_VERSION = \"${VERSION}\"/" wrangler.toml
           echo "Version: ${VERSION}"
 
       - name: Set version for preview (commit SHA)
         if: github.ref_type != 'tag'
         run: |
           VERSION="${GITHUB_SHA::7}"
-          sed -i "s/vDev/${VERSION}/g" wrangler.toml
+          sed -i "/env.preview.vars/,/TSRSS_VERSION/s/TSRSS_VERSION = \"vDev\"/TSRSS_VERSION = \"${VERSION}\"/" wrangler.toml
           echo "Version: ${VERSION}"
 
       - name: Auto-detect resource IDs
@@ -67,13 +67,12 @@ jobs:
           fi
 
       - name: Set production secret
-        if: github.ref_type == 'tag'
-        continue-on-error: true
+        if: github.ref_type == 'tag' && secrets.TSRSS_PASSWORD != ''
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           TSRSS_PASSWORD: ${{ secrets.TSRSS_PASSWORD }}
         run: |
-          echo "$TSRSS_PASSWORD" | npx wrangler secret put TSRSS_PASSWORD
+          echo "$TSRSS_PASSWORD" | npx wrangler secret put TSRSS_PASSWORD --env=""
 
       - name: Deploy to production
         if: github.ref_type == 'tag'
@@ -84,8 +83,7 @@ jobs:
           command: deploy
 
       - name: Set preview secret
-        if: github.ref_type != 'tag'
-        continue-on-error: true
+        if: github.ref_type != 'tag' && secrets.TSRSS_PREVIEW_PASSWORD != ''
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           TSRSS_PREVIEW_PASSWORD: ${{ secrets.TSRSS_PREVIEW_PASSWORD }}
