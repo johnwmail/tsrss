@@ -80,23 +80,21 @@ jobs:
             echo "KV not found, skipping"
           fi
 
-      - name: Create D1
-        if: steps.names.outputs.db_name != ''
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 create ${{ steps.names.outputs.db_name }}
-
-      - name: Get D1 ID & update wrangler.toml
+      - name: Create D1 & get ID
         if: steps.names.outputs.db_name != ''
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DB_NAME: ${{ steps.names.outputs.db_name }}
           PLACEHOLDER: ${{ steps.names.outputs.d1_placeholder }}
         run: |
-          D1_LIST=$(npx wrangler d1 list --json 2>/dev/null || true)
-          D1_ID=$(echo "$D1_LIST" | jq -r ".result[]? | select(.name == \"$DB_NAME\") | .uuid" 2>/dev/null || true)
-          [ -z "$D1_ID" ] || [ "$D1_ID" = "null" ] && { echo "Failed to find D1"; exit 1; }
+          OUTPUT=$(npx wrangler d1 create "$DB_NAME" 2>&1 || true)
+          echo "$OUTPUT"
+          D1_ID=$(echo "$OUTPUT" | grep -oP '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' || true)
+          if [ -z "$D1_ID" ]; then
+            D1_ID=$(npx wrangler d1 list --json 2>/dev/null | grep -oP "\"uuid\":\s*\"([0-9a-f-]+)\"" | head -1 | grep -oP '[0-9a-f-]{36}' || true)
+          fi
+          [ -z "$D1_ID" ] || [ "$D1_ID" = "null" ] && { echo "Failed to find D1 ID"; exit 1; }
           echo "D1_ID=$D1_ID"
           sed -i "s/$PLACEHOLDER/$D1_ID/" wrangler.toml
 
@@ -108,22 +106,20 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: d1 migrations apply ${{ steps.names.outputs.db_name }} --remote ${{ steps.names.outputs.env_flag }}
 
-      - name: Create KV
-        if: steps.names.outputs.db_name != ''
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: kv namespace create ${{ steps.names.outputs.kv_name }}
-
-      - name: Get KV ID & update wrangler.toml
+      - name: Create KV & get ID
         if: steps.names.outputs.db_name != ''
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           KV_NAME: ${{ steps.names.outputs.kv_name }}
           KV_PLACEHOLDER: ${{ steps.names.outputs.kv_placeholder }}
         run: |
-          KV_LIST=$(npx wrangler kv namespace list --json 2>/dev/null || true)
-          KV_ID=$(echo "$KV_LIST" | jq -r ".result[]? | select(.title == \"$KV_NAME\") | .id" 2>/dev/null || true)
-          [ -z "$KV_ID" ] || [ "$KV_ID" = "null" ] && { echo "Failed to find KV"; exit 1; }
+          OUTPUT=$(npx wrangler kv namespace create "$KV_NAME" 2>&1 || true)
+          echo "$OUTPUT"
+          KV_ID=$(echo "$OUTPUT" | grep -oP '[0-9a-f]{32}' || true)
+          if [ -z "$KV_ID" ]; then
+            KV_ID=$(npx wrangler kv namespace list --json 2>/dev/null | grep -oP "\"id\":\s*\"([0-9a-f]+)\"" | head -1 | grep -oP '[0-9a-f]{32}' || true)
+          fi
+          [ -z "$KV_ID" ] || [ "$KV_ID" = "null" ] && { echo "Failed to find KV ID"; exit 1; }
           echo "KV_ID=$KV_ID"
           sed -i "s/$KV_PLACEHOLDER/$KV_ID/" wrangler.toml
