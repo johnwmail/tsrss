@@ -74,7 +74,7 @@ jobs:
           DB_ID=$(npx --silent wrangler d1 list --json 2>&1 | jq -r ".[] | select(.name == \"$DB_NAME\") | .uuid" 2>/dev/null)
           if [ -n "$DB_ID" ] && [ "$DB_ID" != "null" ]; then
             echo "Deleting existing D1 database: $DB_NAME ($DB_ID)"
-            npx wrangler d1 delete "$DB_NAME" -y $ENV_FLAG
+            npx wrangler d1 delete "$DB_NAME" -y
           else
             echo "D1 database $DB_NAME does not exist, skipping delete"
           fi
