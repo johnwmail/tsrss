@@ -85,7 +85,13 @@ async function parseFeedXML(
   etag: string,
   lastModified: string,
 ): Promise<FeedFetchResult> {
-  const parsed = await feedParser.parseString(body)
+  let parsed
+  try {
+    parsed = await feedParser.parseString(body)
+  } catch {
+    body = body.replace(/&(?!amp;|lt;|gt;|quot;|apos;|#x?[0-9a-fA-F]+;)/g, '&amp;')
+    parsed = await feedParser.parseString(body)
+  }
 
   const title = parsed.title || ''
   const siteURL = parsed.link || ''
