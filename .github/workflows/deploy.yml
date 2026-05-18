@@ -66,17 +66,22 @@ jobs:
             sed -i "s/__PREVIEW_KV_NAMESPACE_ID__/$PREVIEW_KV_ID/" wrangler.toml
           fi
 
+      - name: Set production secret
+        if: github.ref_type == 'tag'
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TSRSS_PASSWORD: ${{ secrets.TSRSS_PASSWORD }}
+        run: |
+          echo "$TSRSS_PASSWORD" | npx wrangler secret put TSRSS_PASSWORD
+
       - name: Deploy to production
         if: github.ref_type == 'tag'
         uses: cloudflare/wrangler-action@v3
-        env:
-          TSRSS_PASSWORD: ${{ secrets.TSRSS_PASSWORD }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
-          secrets: |
-            TSRSS_PASSWORD
 
       - name: Set preview secret
         if: github.ref_type != 'tag'
